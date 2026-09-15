@@ -9,6 +9,9 @@ interface AnalyzeBody {
   idea: string;
   coordinate: CoordinateId;
   genres: string[];
+  /** 多张参考图（优先） */
+  imagesBase64?: string[];
+  /** 单张参考图（向后兼容） */
   imageBase64?: string;
   customTechniques?: CustomTechnique[];
   modelConfig: {
@@ -33,7 +36,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: '请求体格式错误' }, { status: 400 });
   }
 
-  const { idea, coordinate, genres = [], imageBase64, customTechniques = [], modelConfig } = body;
+  const { idea, coordinate, genres = [], imagesBase64, imageBase64, customTechniques = [], modelConfig } = body;
 
   if (!idea || !idea.trim()) {
     return Response.json({ error: '构想内容不能为空' }, { status: 400 });
@@ -57,13 +60,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const userText = buildUserText(idea, coordinate, genres, Boolean(imageBase64));
+  // 归一化图片列表：优先 imagesBase64，兼容单图 imageBase64，最多 4 张
+  const images = (
+    Array.isArray(imagesBase64) && imagesBase64.length > 0
+      ? imagesBase64
+      : imageBase64
+        ? [imageBase64]
+        : []
+  )
+    .filter((u): u is string => typeof u === 'string' && u.startsWith('data:image/'))
+    .slice(0, 4);
+
+  const userText = buildUserText(idea, coordinate, genres, images.length);
 
   let userContent: MessageContent = userText;
-  if (imageBase64 && imageBase64.startsWith('data:image/')) {
+  if (images.length > 0) {
     userContent = [
       { type: 'text', text: userText },
-      { type: 'image_url', image_url: { url: imageBase64 } },
+      ...images.map((url) => ({
+        type: 'image_url' as const,
+        image_url: { url },
+      })),
     ];
   }
 

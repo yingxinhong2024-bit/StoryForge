@@ -24,7 +24,7 @@ export default function HomePage() {
   const [idea, setIdea] = useState('');
   const [coordinate, setCoordinate] = useState<CoordinateId>('speculative-depth');
   const [genres, setGenres] = useState<string[]>([]);
-  const [image, setImage] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
 
   // 配置与数据
   const [settings, setSettings] = useState<ModelSettings | null>(null);
@@ -95,7 +95,8 @@ export default function HomePage() {
           idea,
           coordinate,
           genres,
-          imageBase64: image && visionSupported ? image : undefined,
+          imagesBase64:
+            visionSupported && images.length > 0 ? images : undefined,
           customTechniques,
           modelConfig: {
             baseUrl: settings.baseUrl,
@@ -136,7 +137,7 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [idea, settings, coordinate, genres, image, visionSupported, customTechniques]);
+  }, [idea, settings, coordinate, genres, images, visionSupported, customTechniques]);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -197,8 +198,8 @@ export default function HomePage() {
             onCoordinateChange={setCoordinate}
             genres={genres}
             onGenresChange={setGenres}
-            image={image}
-            onImageChange={setImage}
+            images={images}
+            onImagesChange={setImages}
             visionSupported={visionSupported}
             loading={loading}
             onGenerate={handleGenerate}

@@ -13,12 +13,15 @@ interface Props {
   onCoordinateChange: (v: CoordinateId) => void;
   genres: string[];
   onGenresChange: (v: string[]) => void;
-  image: string | null;
-  onImageChange: (v: string | null) => void;
+  images: string[];
+  onImagesChange: (v: string[]) => void;
   visionSupported: boolean;
   loading: boolean;
   onGenerate: () => void;
 }
+
+const MAX_IMAGES = 4;
+const MAX_FILE_SIZE = 4 * 1024 * 1024;
 
 export default function InputPanel({
   idea,
@@ -27,25 +30,40 @@ export default function InputPanel({
   onCoordinateChange,
   genres,
   onGenresChange,
-  image,
-  onImageChange,
+  images,
+  onImagesChange,
   visionSupported,
   loading,
   onGenerate,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = (file: File) => {
-    if (!file.type.startsWith('image/')) return;
-    if (file.size > 4 * 1024 * 1024) {
-      alert('图片请控制在 4MB 以内');
-      return;
+  const handleFiles = (files: FileList) => {
+    const remaining = MAX_IMAGES - images.length;
+    if (remaining <= 0) return;
+    const picked = Array.from(files)
+      .filter((f) => f.type.startsWith('image/'))
+      .slice(0, remaining);
+    // FileReader 是异步回调，用闭包累加器保证多文件依次追加
+    let acc = [...images];
+    for (const file of picked) {
+      if (file.size > MAX_FILE_SIZE) {
+        alert(`「${file.name}」超过 4MB，已跳过`);
+        continue;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          acc = [...acc, reader.result];
+          onImagesChange(acc);
+        }
+      };
+      reader.readAsDataURL(file);
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') onImageChange(reader.result);
-    };
-    reader.readAsDataURL(file);
+  };
+
+  const removeImage = (index: number) => {
+    onImagesChange(images.filter((_, i) => i !== index));
   };
 
   const applySample = (index: number) => {
@@ -97,33 +115,43 @@ export default function InputPanel({
       {/* 题材多选 */}
       <GenreSelector value={genres} onChange={onGenresChange} />
 
-      {/* 图片上传 */}
+      {/* 图片上传（最多 MAX_IMAGES 张） */}
       <div>
-        <label className="mb-2 block text-sm font-medium text-slate-300">
-          参考图（可选）
-        </label>
-        {image ? (
-          <div className="relative">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={image}
-              alt="参考图"
-              className="max-h-40 w-full rounded-lg border border-slate-600 object-cover"
-            />
-            <button
-              type="button"
-              onClick={() => onImageChange(null)}
-              className="absolute right-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-xs text-white transition hover:bg-black/80"
-            >
-              移除
-            </button>
-            {!visionSupported && (
-              <p className="mt-1.5 text-xs text-amber-400">
-                当前配置的模型可能不支持视觉输入，生成时将跳过此图片。
-              </p>
-            )}
+        <div className="mb-2 flex items-baseline justify-between">
+          <label className="text-sm font-medium text-slate-300">
+            参考图（可选）
+          </label>
+          {images.length > 0 && (
+            <span className="text-xs text-slate-500">
+              {images.length}/{MAX_IMAGES} 张
+            </span>
+          )}
+        </div>
+
+        {images.length > 0 && (
+          <div className="mb-2 grid grid-cols-2 gap-2">
+            {images.map((img, i) => (
+              <div key={i} className="group relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={img}
+                  alt={`参考图 ${i + 1}`}
+                  className="h-24 w-full rounded-lg border border-slate-600 object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeImage(i)}
+                  aria-label={`移除参考图 ${i + 1}`}
+                  className="absolute right-1.5 top-1.5 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/80"
+                >
+                  移除
+                </button>
+              </div>
+            ))}
           </div>
-        ) : (
+        )}
+
+        {images.length < MAX_IMAGES && (
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -141,17 +169,28 @@ export default function InputPanel({
               <circle cx="8.5" cy="8.5" r="1.5" />
               <path d="m21 15-5-5L5 21" />
             </svg>
-            上传情绪板 / 手写笔记照片
+            {images.length === 0
+              ? '上传情绪板 / 手写笔记照片'
+              : '继续添加参考图'}
           </button>
         )}
+
+        {images.length > 0 && !visionSupported && (
+          <p className="mt-1.5 text-xs text-amber-400">
+            当前配置的模型可能不支持视觉输入，生成时将跳过所有图片。
+          </p>
+        )}
+
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
           onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) handleFile(f);
+            if (e.target.files && e.target.files.length > 0) {
+              handleFiles(e.target.files);
+            }
             e.target.value = '';
           }}
         />

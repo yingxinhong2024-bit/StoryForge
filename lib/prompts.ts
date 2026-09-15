@@ -271,7 +271,7 @@ export function buildUserText(
   idea: string,
   coordinateId: CoordinateId,
   genreIds: string[],
-  hasImage: boolean
+  imageCount = 0
 ): string {
   const coordinate = COORDINATES.find((c) => c.id === coordinateId);
   const genreNames = GENRES.filter((g) => genreIds.includes(g.id))
@@ -286,9 +286,12 @@ ${idea}
 【我选择的文学坐标】${coordinate?.name ?? coordinateId}
 【我选择的题材】${genreNames || '（未选择，请由你推荐）'}`;
 
-  if (hasImage) {
+  if (imageCount === 1) {
     text +=
       '\n【参考图片】我附带了一张参考图（情绪板/手写笔记/氛围参考），请将其中的氛围、意象或线索融入分析。';
+  } else if (imageCount > 1) {
+    text +=
+      `\n【参考图片】我附带了 ${imageCount} 张参考图（情绪板/手写笔记/氛围参考），它们可能分别对应故事的不同阶段、场景或人物气质，请综合其中的氛围、意象与线索融入分析。`;
   }
   return text;
 }
